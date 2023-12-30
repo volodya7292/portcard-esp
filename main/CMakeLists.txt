@@ -1,4 +1,4 @@
-idf_component_register(SRCS "usb_audio.c" "main.c" "spi_receiver.c" "i2s_audio.c" "audio_transformer.c"
+idf_component_register(SRCS "main.c" "spi_receiver.c" "i2s_audio.c" "audio_transformer.c"
     INCLUDE_DIRS ".")
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error)

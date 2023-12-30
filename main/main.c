@@ -9,17 +9,13 @@
 #include "led_strip.h"
 #include "math.h"
 #include "esp_dsp.h"
-// #include "usb.h"
-// #include "usb_audio.h"
 #include "i2s_audio.h"
 #include "audio_transformer.h"
 #include "driver/spi_common.h"
 #include "spi_receiver.h"
-// #include "sdkconfig.h"
 // #include "esp_console.h"
 
-#define IO_AUDIO_FREQ CFG_TUD_AUDIO_FUNC_1_MAX_SAMPLE_RATE
-
+#define IO_AUDIO_FREQ 48000
 #define BLINK_GPIO GPIO_NUM_21
 
 static led_strip_handle_t led_strip;
@@ -84,6 +80,8 @@ void app_main()
     // init_usb_audio(rb_in2trans);
     // init_usb();
 
+    // TODO: use dsps_fft2r_sc16 for FFT
+
     init_spi_receiver(rb_in2trans);
     init_i2s_audio(rb_trans2out, IO_AUDIO_FREQ);
     init_audio_transformer(rb_in2trans, rb_trans2out);
@@ -121,25 +119,5 @@ void app_main()
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 
-    // TODO: use dsps_fft2r_sc16 for FFT
 
-    // ESP_LOGI(TAG, "USB initialization DONE");
-    // while (1) {
-    // // ESP_LOGI(TAG, "log -> UART");
-    // vTaskDelay(1000 / portTICK_PERIOD_MS);
-    // fprintf(stdout, "example: print -> stdout\n");
-    // vTaskDelay(1000 / portTICK_PERIOD_MS);
-    // fprintf(stderr, "example: print -> stderr\n");
-    // vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-    // // esp_tusb_init_console(TINYUSB_CDC_ACM_0); // log to usb
-    // // ESP_LOGI(TAG, "log -> USB");
-    // vTaskDelay(1000 / portTICK_PERIOD_MS);
-    // fprintf(stdout, "example: print -> stdout\n");
-    // vTaskDelay(1000 / portTICK_PERIOD_MS);
-    // fprintf(stderr, "example: print -> stderr\n");
-    // vTaskDelay(1000 / portTICK_PERIOD_MS);
-    // // esp_tusb_deinit_console(TINYUSB_CDC_ACM_0); // log to uart
-
-    // }
 }

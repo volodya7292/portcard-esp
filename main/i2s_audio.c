@@ -41,8 +41,7 @@ static void i2s_write_task(void *args)
     uint8_t *w_buf = (uint8_t *)calloc(1, I2S_BUFF_SIZE);
     assert(w_buf); // Check if w_buf allocation success
 
-    size_t w_bytes = I2S_BUFF_SIZE;
-
+    // TODO
     // /* (Optional) Preload the data before enabling the TX channel, so that the valid data can be transmitted immediately */
     // while (w_bytes == I2S_BUFF_SIZE) {
     //     /* Here we load the target buffer repeatedly, until all the DMA buffers are preloaded */
@@ -60,17 +59,11 @@ static void i2s_write_task(void *args)
         memcpy(w_buf, bytes, received_size);
         vRingbufferReturnItem(m_in_rb, bytes);
 
-        // uint16_t* samples = (uint16_t*)bytes;
-
-        // i2s_channel_
-
         if (i2s_channel_write(tx_chan, w_buf, received_size, NULL, portMAX_DELAY) != ESP_OK)
         {
             // printf("Write Task: i2s write %d bytes\n", w_bytes);
             printf("Write Task: i2s write failed\n");
         }
-
-        // vTaskDelay(1);
     }
 
     free(w_buf);
@@ -83,5 +76,5 @@ void init_i2s_audio(RingbufHandle_t in_buf, uint32_t output_freq)
     m_output_freq = output_freq;
 
     i2s_init_std_simplex();
-    xTaskCreate(i2s_write_task, "i2s_write_task", 4096, NULL, 5, NULL);
+    xTaskCreate(i2s_write_task, "i2s_write_task", 4096, NULL, 3, NULL);
 }
