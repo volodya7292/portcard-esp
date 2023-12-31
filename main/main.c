@@ -8,7 +8,6 @@
 #include "esp_log.h"
 #include "led_strip.h"
 #include "math.h"
-#include "esp_dsp.h"
 #include "i2s_audio.h"
 #include "audio_transformer.h"
 #include "driver/spi_common.h"
@@ -39,6 +38,11 @@ void on_data_receive()
 {
     led_strip_set_pixel(led_strip, 0, 16, 16, 16);
     // led_strip_refresh(led_strip);
+}
+
+void on_controls_change(float volume_factor)
+{
+    audio_transformer_set_volume(volume_factor);
 }
 
 void app_main()
@@ -76,13 +80,12 @@ void app_main()
         printf("Failed to create ringbuf!\n");
     }
 
-
     // init_usb_audio(rb_in2trans);
     // init_usb();
 
     // TODO: use dsps_fft2r_sc16 for FFT
 
-    init_spi_receiver(rb_in2trans);
+    init_spi_receiver(rb_in2trans, on_controls_change);
     init_i2s_audio(rb_trans2out, IO_AUDIO_FREQ);
     init_audio_transformer(rb_in2trans, rb_trans2out);
 
@@ -118,6 +121,4 @@ void app_main()
         fprintf(stdout, "example: print -> stdout\n");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-
-
 }

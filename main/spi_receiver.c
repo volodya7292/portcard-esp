@@ -9,15 +9,25 @@
 #define SPI_PIN_SCK 9
 #define SPI_PIN_TX 7
 
-#define MAX_PACKET_SIZE 1024
-#define PACKETS_IN_FLIGHT 3
-
 #define IN_CHANNELS 8
 #define IN_SINGLE_SAMPLE_SIZE 2
 #define IN_FULL_SAMPLE_SIZE (IN_CHANNELS * IN_SINGLE_SAMPLE_SIZE)
 
-static RingbufHandle_t m_out_rb = NULL;
+#define MAX_TRANSACTION_SIZE 2048
+#define PACKETS_IN_FLIGHT 3
 
+#define PACKET_SIZE 256
+#define PACKET_TYPE_SIZE 1
+#define PACKET_PAYLOAD_SIZE (PACKET_SIZE - PACKET_TYPE_SIZE)
+
+enum
+{
+    PACKET_TYPE_CONTROL = 0,
+    PACKET_TYPE_PCM
+};
+
+static RingbufHandle_t m_out_rb = NULL;
+static func_controls_change m_on_controls_change = NULL;
 
 static void check_err(esp_err_t err)
 {
@@ -32,15 +42,30 @@ static void check_err(esp_err_t err)
     }
 }
 
+static void process_packet(uint8_t *pkt)
+{
+    uint8_t pkt_type = pkt[0];
+    pkt += 1;
+
+    if (pkt_type == PACKET_TYPE_PCM)
+    {
+        uint32_t pcm_size = PACKET_PAYLOAD_SIZE - PACKET_PAYLOAD_SIZE % IN_FULL_SAMPLE_SIZE;
+        xRingbufferSend(m_out_rb, pkt, pcm_size, 0);
+    } else if (pkt_type == PACKET_TYPE_CONTROL) {
+        float volume_factor = *(float*)pkt;
+        m_on_controls_change(volume_factor);
+    }
+}
+
 static void spi_receiver_task(void *args)
 {
-    WORD_ALIGNED_ATTR static uint8_t recvbuf[PACKETS_IN_FLIGHT][MAX_PACKET_SIZE] = {0};
+    WORD_ALIGNED_ATTR static uint8_t recvbuf[PACKETS_IN_FLIGHT][MAX_TRANSACTION_SIZE] = {0};
     spi_slave_transaction_t trans[PACKETS_IN_FLIGHT] = {0};
     esp_err_t ret;
 
     for (int i = 0; i < PACKETS_IN_FLIGHT; i++)
     {
-        trans[i].length = MAX_PACKET_SIZE * 8;
+        trans[i].length = MAX_TRANSACTION_SIZE * 8;
         trans[i].rx_buffer = recvbuf[i];
         ret = spi_slave_queue_trans(SPI_INSTANCE, &trans[i], portMAX_DELAY);
         check_err(ret);
@@ -60,19 +85,26 @@ static void spi_receiver_task(void *args)
         {
             // Prevents channel order corruption
             uint32_t trans_bytesize = curr_trans->trans_len / 8;
-            uint32_t corruption = trans_bytesize % IN_FULL_SAMPLE_SIZE;
+            if (trans_bytesize > MAX_TRANSACTION_SIZE)
+            {
+                trans_bytesize = MAX_TRANSACTION_SIZE;
+            }
+            uint32_t corruption = trans_bytesize % PACKET_SIZE;
             uint32_t proper_len = trans_bytesize - corruption;
 
-            if (corruption > 0) {
+            if (corruption > 0)
+            {
                 printf("corrupted pkt: %lu %lu\n", trans_bytesize, corruption);
             }
 
-            uint8_t *curr_buf = (uint8_t *)curr_trans->rx_buffer;
-            xRingbufferSend(m_out_rb, curr_buf, proper_len, 0);
+            for (int off = 0; off < proper_len; off += PACKET_SIZE)
+            {
+                process_packet(curr_trans->rx_buffer + off);
+            }
 
             if (t % 1000 == 0)
             {
-                printf("recv %lu %d\n", proper_len, curr_buf[5]);
+                printf("recv %lu\n", proper_len);
             }
         }
 
@@ -86,9 +118,10 @@ static void spi_receiver_task(void *args)
     vTaskDelete(NULL);
 }
 
-void init_spi_receiver(RingbufHandle_t out_rb)
+void init_spi_receiver(RingbufHandle_t out_rb, func_controls_change on_controls_change)
 {
     m_out_rb = out_rb;
+    m_on_controls_change = on_controls_change;
 
     // Configuration for the SPI bus
     spi_bus_config_t buscfg = {
@@ -111,5 +144,5 @@ void init_spi_receiver(RingbufHandle_t out_rb)
     esp_err_t ret = spi_slave_initialize(SPI_INSTANCE, &buscfg, &slvcfg, SPI_DMA_CH_AUTO);
     check_err(ret);
 
-    (void)xTaskCreate(spi_receiver_task, "spi_receiver", 4096, NULL, 3, NULL);
+    (void)xTaskCreate(spi_receiver_task, "spi_receiver", 8192, NULL, 3, NULL);
 }
