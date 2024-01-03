@@ -6,7 +6,7 @@
 #define I2S_BCLK_IO1 GPIO_NUM_1
 #define I2S_WS_IO1 GPIO_NUM_2
 #define I2S_DOUT_IO1 GPIO_NUM_4
-#define I2S_BUFF_SIZE 4096
+#define I2S_BUFF_SIZE 1024
 
 static uint32_t m_output_freq = 0;
 static RingbufHandle_t m_in_rb = NULL;
@@ -55,7 +55,7 @@ static void i2s_write_task(void *args)
     {
         size_t received_size = 0;
         // void* bytes = xRingbufferReceive(m_in_rb, &received_size, portMAX_DELAY);
-        void *bytes = xRingbufferReceiveUpTo(m_in_rb, &received_size, portMAX_DELAY, 1024);
+        void *bytes = xRingbufferReceiveUpTo(m_in_rb, &received_size, portMAX_DELAY, I2S_BUFF_SIZE);
         memcpy(w_buf, bytes, received_size);
         vRingbufferReturnItem(m_in_rb, bytes);
 
@@ -76,5 +76,5 @@ void init_i2s_audio(RingbufHandle_t in_buf, uint32_t output_freq)
     m_output_freq = output_freq;
 
     i2s_init_std_simplex();
-    xTaskCreate(i2s_write_task, "i2s_write_task", 4096, NULL, 3, NULL);
+    xTaskCreate(i2s_write_task, "i2s_write_task", 1024, NULL, 3, NULL);
 }

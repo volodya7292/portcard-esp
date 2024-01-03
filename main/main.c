@@ -17,6 +17,10 @@
 #define IO_AUDIO_FREQ 48000
 #define BLINK_GPIO GPIO_NUM_21
 
+// double-buffered ring buffer sizes
+#define AUDIO_PROCESS_IN_RB_SIZE (AUDIO_PROCESS_BLOCK_SIZE * AUDIO_PROCESS_IN_CHANNELS * AUDIO_PROCESS_BPS * 2) 
+#define AUDIO_PROCESS_OUT_RB_SIZE (AUDIO_PROCESS_BLOCK_SIZE * AUDIO_PROCESS_OUT_CHANNELS * AUDIO_PROCESS_BPS * 2) 
+
 static led_strip_handle_t led_strip;
 
 static void configure_led(void)
@@ -68,13 +72,13 @@ void app_main()
 
     configure_led();
 
-    RingbufHandle_t rb_in2trans = xRingbufferCreate(4096, RINGBUF_TYPE_BYTEBUF);
+    RingbufHandle_t rb_in2trans = xRingbufferCreate(AUDIO_PROCESS_IN_RB_SIZE, RINGBUF_TYPE_BYTEBUF);
     if (rb_in2trans == NULL)
     {
         printf("Failed to create ringbuf!\n");
     }
 
-    RingbufHandle_t rb_trans2out = xRingbufferCreate(4096, RINGBUF_TYPE_BYTEBUF);
+    RingbufHandle_t rb_trans2out = xRingbufferCreate(AUDIO_PROCESS_OUT_RB_SIZE, RINGBUF_TYPE_BYTEBUF);
     if (rb_trans2out == NULL)
     {
         printf("Failed to create ringbuf!\n");
