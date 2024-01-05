@@ -1,17 +1,17 @@
 #ifndef _RESOURCES_H_
 #define _RESOURCES_H_
 
-extern const uint8_t ___res_BL_wav_start[] asm("_binary_BL_wav_start");
-extern const uint8_t ___res_BL_wav_end[] asm("_binary_BL_wav_end");
+// extern const uint8_t ___res_BL_wav_start[] asm("_binary_BL_wav_start");
+// extern const uint8_t ___res_BL_wav_end[] asm("_binary_BL_wav_end");
 
-extern const uint8_t ___res_BR_wav_start[] asm("_binary_BR_wav_start");
-extern const uint8_t ___res_BR_wav_end[] asm("_binary_BR_wav_end");
+// extern const uint8_t ___res_BR_wav_start[] asm("_binary_BR_wav_start");
+// extern const uint8_t ___res_BR_wav_end[] asm("_binary_BR_wav_end");
 
-extern const uint8_t ___res_SL_wav_start[] asm("_binary_SL_wav_start");
-extern const uint8_t ___res_SL_wav_end[] asm("_binary_SL_wav_end");
+// extern const uint8_t ___res_SL_wav_start[] asm("_binary_SL_wav_start");
+// extern const uint8_t ___res_SL_wav_end[] asm("_binary_SL_wav_end");
 
-extern const uint8_t ___res_SR_wav_start[] asm("_binary_SR_wav_start");
-extern const uint8_t ___res_SR_wav_end[] asm("_binary_SR_wav_end");
+// extern const uint8_t ___res_SR_wav_start[] asm("_binary_SR_wav_start");
+// extern const uint8_t ___res_SR_wav_end[] asm("_binary_SR_wav_end");
 
 extern const uint8_t ___res_FL_wav_start[] asm("_binary_FL_wav_start");
 extern const uint8_t ___res_FL_wav_end[] asm("_binary_FL_wav_end");
@@ -19,11 +19,11 @@ extern const uint8_t ___res_FL_wav_end[] asm("_binary_FL_wav_end");
 extern const uint8_t ___res_FR_wav_start[] asm("_binary_FR_wav_start");
 extern const uint8_t ___res_FR_wav_end[] asm("_binary_FR_wav_end");
 
-extern const uint8_t ___res_FC_wav_start[] asm("_binary_FC_wav_start");
-extern const uint8_t ___res_FC_wav_end[] asm("_binary_FC_wav_end");
+// extern const uint8_t ___res_FC_wav_start[] asm("_binary_FC_wav_start");
+// extern const uint8_t ___res_FC_wav_end[] asm("_binary_FC_wav_end");
 
-extern const uint8_t ___res_LFE_wav_start[] asm("_binary_LFE_wav_start");
-extern const uint8_t ___res_LFE_wav_end[] asm("_binary_LFE_wav_end");
+// extern const uint8_t ___res_LFE_wav_start[] asm("_binary_LFE_wav_start");
+// extern const uint8_t ___res_LFE_wav_end[] asm("_binary_LFE_wav_end");
 
 #define GET_RES_SIZE(res) (res##_end - res##_start)
 

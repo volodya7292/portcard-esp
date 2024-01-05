@@ -5,6 +5,7 @@
 #include "resources.h"
 #include "block_convoler.h"
 #include "esp_psram.h"
+#include "stdatomic.h"
 
 // #define OUT_PACKET_SAMPLES 480
 #define IN_CHANNELS 8
@@ -14,6 +15,7 @@
 // #define CMPLX_NUM 2 // complex number has 2 real numbers
 #define TOTAL_CH_SAMPLES (IN_CHANNELS * PACKET_SAMPLES)
 #define IN_PACKET_SIZE (IN_CHANNELS * PACKET_SAMPLES * AUDIO_PROCESS_BPS)
+// #define PROC_CORES 2
 
 // #define WINDOW_N_NUMSAUDIO_PROCESS_BLOCK_SIZE * CMPLX_NUM
 
@@ -176,6 +178,81 @@ static void process_channel(int16_t *data, uint32_t n)
     // printf("mul: %lu\n", t1 - t0);
 }
 
+// static volatile bool working[2] = {false};
+// static atomic_bool working[2] = {0};
+static EventGroupHandle_t working;
+static float *conv_scratch1;
+static float *conv_scratch2;
+// static volatile int16_t *conv_fl_left_out;
+// static volatile int16_t *conv_fl_right_out;
+// static volatile int16_t *conv_fr_left_out;
+// static volatile int16_t *conv_fr_right_out;
+
+static uint32_t tidx_arr[2] = {0, 1};
+static uint32_t tidx_core[2] = {0, 1};
+
+static void conv_worker(void *args)
+{
+    uint32_t tidx = ((uint32_t *)args)[0];
+
+    float i16_max = 32767.0f;
+    float i16_norm = 1.0f / i16_max;
+    float conv_norm = 1.0f / 2.0f * i16_max;
+
+    while (1)
+    {
+        xEventGroupWaitBits(working, 1 << tidx, pdTRUE, pdTRUE, portMAX_DELAY);
+
+        int16_t *src = get_sliding_block(tidx);
+        float *scratch;
+        // int16_t *out = out_samples[tidx];
+        block_convoler_t *conv1;
+        block_convoler_t *conv2;
+
+        if (tidx == 0)
+        {
+            scratch = conv_scratch1;
+            conv1 = &fl_left_conv;
+            conv2 = &fr_left_conv;
+        }
+        else
+        {
+            scratch = conv_scratch2;
+            conv1 = &fl_right_conv;
+            conv2 = &fr_right_conv;
+        }
+
+        // if (tidx == 1)
+        // {
+            for (int i = 0; i < AUDIO_PROCESS_BLOCK_SIZE * 2; i++)
+            {
+                scratch[i << 1] = src[i];
+                scratch[(i << 1) + 1] = 0.0f;
+            }
+            dsps_mulc_f32_ansi(scratch, scratch, AUDIO_PROCESS_BLOCK_SIZE * 2, i16_norm, 2, 2);
+            block_convolver_process(conv1, scratch);
+            for (int i = 0; i < AUDIO_PROCESS_BLOCK_SIZE; i++)
+            {
+                out_samples[i * OUT_CHANNELS + tidx] += scratch[i] * conv_norm;
+            }
+
+            for (int i = 0; i < AUDIO_PROCESS_BLOCK_SIZE * 2; i++)
+            {
+                scratch[i << 1] = src[i];
+                scratch[(i << 1) + 1] = 0.0f;
+            }
+            dsps_mulc_f32_ansi(scratch, scratch, AUDIO_PROCESS_BLOCK_SIZE * 2, i16_norm, 2, 2);
+            block_convolver_process(conv2, scratch);
+            for (int i = 0; i < AUDIO_PROCESS_BLOCK_SIZE; i++)
+            {
+                out_samples[i * OUT_CHANNELS + tidx] += scratch[i] * conv_norm;
+            }
+        // }
+
+        xEventGroupSetBits(working, 1 << (tidx + 2));
+    }
+}
+
 static void do_process()
 {
     int16_t vol_i16 = m_volume_factor * 32767;
@@ -203,15 +280,33 @@ static void do_process()
         dsps_mulc_s16(curr_block, curr_block, AUDIO_PROCESS_BLOCK_SIZE, vol_i16, 1, 1);
     }
 
-    // Transform
-    int16_t* conv_fl_left_out = block_convolver_process(&fl_left_conv, get_sliding_block(0));
-    int16_t* conv_fl_right_out = block_convolver_process(&fl_right_conv, get_sliding_block(1));
-    int16_t* conv_fr_left_out = block_convolver_process(&fl_left_conv, get_sliding_block(0));
-    int16_t* conv_fr_right_out = block_convolver_process(&fl_right_conv, get_sliding_block(1));
+    memset(out_samples, 0, OUT_CHANNELS * AUDIO_PROCESS_BLOCK_SIZE * sizeof(out_samples[0]));
+
+    // TODO: Split it up onto two cores: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/pthread.html
+
+    // working
+    // atomic_fetch_add(&working_start, 1);
+    // while (atomic_load(&working_start) < 2)
+    // {
+    //     // printf("pc5 %lu %i %i\n", tidx, working[0], working[1]);
+    //     continue;
+    // }
+
+    xEventGroupSetBits(working, (1 << 0) | (1 << 1));
+    xEventGroupWaitBits(working, (1 << 2) | (1 << 3), pdTRUE, pdTRUE, portMAX_DELAY);
+
+    // assert(dsps_add_s16_ansi(out_samples[0], out_samples[1], out_samples[0], AUDIO_PROCESS_BLOCK_SIZE, 1, 1, 1, 0) == ESP_OK);
+
+    // while (x)
+    // {
+    //     // printf("%i %i\n", atomic_load(&working[0]), atomic_load(&working[1]));
+    //     continue;
+    // }
+    // printf("2\n");
 
     // Output
     // int16_t *curr_block_ch0 = get_sliding_block(0) + AUDIO_PROCESS_BLOCK_SIZE * CMPLX_NUM;
-    int16_t *curr_block_ch1 = get_sliding_block(1) + AUDIO_PROCESS_BLOCK_SIZE;
+    // int16_t *curr_block_ch1 = get_sliding_block(1) + AUDIO_PROCESS_BLOCK_SIZE;
 
     // dsps_fft2r_sc16_ae32(curr_block_ch0,AUDIO_PROCESS_BLOCK_SIZE);
     // dsps_bit_rev_sc16_ansi(curr_block_ch0,AUDIO_PROCESS_BLOCK_SIZE);
@@ -233,14 +328,14 @@ static void do_process()
     // // uint32_t t1 = esp_cpu_get_cycle_count();
     // // printf("TT: %lu\n", t1 - t0);
 
-    for (int i = 0; i < AUDIO_PROCESS_BLOCK_SIZE; i++)
-    {
-        int16_t v1 = conv_fl_left_out[i];
-        int16_t v2 = curr_block_ch1[i];
+    // for (int i = 0; i < AUDIO_PROCESS_BLOCK_SIZE; i++)
+    // {
+    //     int16_t v1 = conv_fl_left_out[i];
+    //     int16_t v2 = curr_block_ch1[i];
 
-        out_samples[i * OUT_CHANNELS] = v1;
-        out_samples[i * OUT_CHANNELS + 1] = v2;
-    }
+    //     out_samples[i * OUT_CHANNELS] = v1;
+    //     out_samples[i * OUT_CHANNELS + 1] = v2;
+    // }
 }
 
 static void transformer_task(void *args)
@@ -252,6 +347,7 @@ static void transformer_task(void *args)
         uint32_t t0 = esp_cpu_get_cycle_count();
         do_process();
         uint32_t t1 = esp_cpu_get_cycle_count();
+
         printf("TT2: %lu\n", t1 - t0);
         xRingbufferSend(m_out_rb, out_samples, sizeof(out_samples), 0);
 
@@ -352,44 +448,56 @@ void init_audio_transformer(RingbufHandle_t in_buf, RingbufHandle_t out_buf)
 {
     m_in_rb = in_buf;
     m_out_rb = out_buf;
+    working = xEventGroupCreate();
+
     sliding_blocks = heap_caps_aligned_calloc(16, SLIDING_CHANNELS * AUDIO_PROCESS_BLOCK_SIZE * NUM_WINDOWS, sizeof(int16_t), MALLOC_CAP_INTERNAL);
 
-    float* conv_scratch = heap_caps_aligned_alloc(16, AUDIO_PROCESS_BLOCK_SIZE * 16, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    conv_scratch1 = heap_caps_aligned_alloc(16, AUDIO_PROCESS_BLOCK_SIZE * 16, MALLOC_CAP_INTERNAL);
+    conv_scratch2 = heap_caps_aligned_alloc(16, AUDIO_PROCESS_BLOCK_SIZE * 16, MALLOC_CAP_INTERNAL);
 
     // while (1) {
     //     printf("%lu %lu %lu\n", (uint32_t)sliding_blocks, (uint32_t)in_samples, (uint32_t)out_samples);
     // }
 
+    wav_data_t fl_data;
+    parse_wav(___res_FL_wav_start, &fl_data);
+    wav_data_t fr_data;
+    parse_wav(___res_FR_wav_start, &fr_data);
 
-    wav_data_t bl_data;
-    parse_wav(___res_BL_wav_start, &bl_data);
-
-    int16_t *temp = heap_caps_malloc(bl_data.channel_size, MALLOC_CAP_SPIRAM);
-    for (int i = 0; i < bl_data.num_samples; i++)
+    int16_t *temp = heap_caps_malloc(fl_data.channel_size, MALLOC_CAP_SPIRAM);
+    for (int i = 0; i < fl_data.num_samples; i++)
     {
-        temp[i] = bl_data.data[i * 2];
+        temp[i] = fl_data.data[i * 2];
     }
-
-    block_convolver_init(&fl_left_conv, conv_scratch, AUDIO_PROCESS_BLOCK_SIZE, temp, bl_data.num_samples);
+    block_convolver_init(&fl_left_conv, conv_scratch1, AUDIO_PROCESS_BLOCK_SIZE, temp, fl_data.num_samples);
     heap_caps_free(temp);
 
-
-    temp = heap_caps_malloc(bl_data.channel_size, MALLOC_CAP_SPIRAM);
-    for (int i = 0; i < bl_data.num_samples; i++)
+    temp = heap_caps_malloc(fl_data.channel_size, MALLOC_CAP_SPIRAM);
+    for (int i = 0; i < fl_data.num_samples; i++)
     {
-        temp[i] = bl_data.data[i * 2 + 1];
+        temp[i] = fl_data.data[i * 2 + 1];
     }
-
-    block_convolver_init(&fl_right_conv, conv_scratch, AUDIO_PROCESS_BLOCK_SIZE, temp, bl_data.num_samples);
+    block_convolver_init(&fl_right_conv, conv_scratch1, AUDIO_PROCESS_BLOCK_SIZE, temp, fl_data.num_samples);
     heap_caps_free(temp);
 
-    // while (1) {
-    //     printf("%i %i %lu\n", heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_free_size(MALLOC_CAP_RTCRAM), esp_get_free_heap_size());
-    //     vTaskDelay(1000 / portTICK_PERIOD_MS);
-    // }
+    temp = heap_caps_malloc(fr_data.channel_size, MALLOC_CAP_SPIRAM);
+    for (int i = 0; i < fr_data.num_samples; i++)
+    {
+        temp[i] = fr_data.data[i * 2];
+    }
+    block_convolver_init(&fr_left_conv, conv_scratch1, AUDIO_PROCESS_BLOCK_SIZE, temp, fr_data.num_samples);
+    heap_caps_free(temp);
 
-    // block_convolver_init(&fr_left_conv, AUDIO_PROCESS_BLOCK_SIZE, bl_data.data, bl_data.channel_size / sizeof(int16_t));
-    // block_convolver_init(&fr_right_conv, AUDIO_PROCESS_BLOCK_SIZE, bl_data.data + bl_data.channel_size, bl_data.channel_size / sizeof(int16_t));
+    temp = heap_caps_malloc(fr_data.channel_size, MALLOC_CAP_SPIRAM);
+    for (int i = 0; i < fr_data.num_samples; i++)
+    {
+        temp[i] = fr_data.data[i * 2 + 1];
+    }
+    block_convolver_init(&fr_right_conv, conv_scratch1, AUDIO_PROCESS_BLOCK_SIZE, temp, fr_data.num_samples);
+    heap_caps_free(temp);
+
+    // block_convolver_init(&fr_left_conv, AUDIO_PROCESS_BLOCK_SIZE, fl_data.data, fl_data.channel_size / sizeof(int16_t));
+    // block_convolver_init(&fr_right_conv, AUDIO_PROCESS_BLOCK_SIZE, fl_data.data + fl_data.channel_size, fl_data.channel_size / sizeof(int16_t));
 
     // assert(dsps_fft2r_init_sc16(NULL,AUDIO_PROCESS_BLOCK_SIZE) == ESP_OK);
     // assert(dsps_fft2r_init_sc16(NULL, PROCESS_BLOCK_SIZE) == ESP_OK);
@@ -398,7 +506,16 @@ void init_audio_transformer(RingbufHandle_t in_buf, RingbufHandle_t out_buf)
     // assert(dsps_fft2r_init_fc32(NULL, CONFIG_DSP_MAX_FFT_SIZE) == ESP_OK);
     // assert(dsps_fft4r_init_fc32(NULL, CONFIG_DSP_MAX_FFT_SIZE) == ESP_OK);
 
-    xTaskCreate(transformer_task, "transformer_task", 4096, NULL, 3, NULL);
+    xTaskCreate(transformer_task, "transformer_task", 2048, NULL, 3, NULL);
+    xTaskCreatePinnedToCore(conv_worker, "conv_worker0", 2048, &tidx_arr[0], 2, NULL, tidx_core[0]);
+    xTaskCreatePinnedToCore(conv_worker, "conv_worker1", 2048, &tidx_arr[1], 2, NULL, tidx_core[1]);
+
+    // while (1)
+    // {
+    //     printf("%i %i %lu\n", heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_free_size(MALLOC_CAP_RTCRAM), esp_get_free_heap_size());
+    //     printf("%lu %lu\n", (uint32_t)conv_scratch1, (uint32_t)conv_scratch1);
+    //     vTaskDelay(1000 / portTICK_PERIOD_MS);
+    // }
 }
 
 void audio_transformer_set_volume(float volume_factor)
