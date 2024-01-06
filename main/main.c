@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "tinyusb.h"
-#include "tusb_cdc_acm.h"
-#include "tusb_console.h"
-#include "tusb.h"
+// #include "tinyusb.h"
+// #include "tusb_cdc_acm.h"
+// #include "tusb_console.h"
+// #include "tusb.h"
+#include "usb.h"
+#include "usb_audio.h"
 #include "esp_log.h"
 #include "led_strip.h"
 #include "math.h"
@@ -18,8 +20,8 @@
 #define BLINK_GPIO GPIO_NUM_21
 
 // double-buffered ring buffer sizes
-#define AUDIO_PROCESS_IN_RB_SIZE (AUDIO_PROCESS_BLOCK_SIZE * AUDIO_PROCESS_IN_CHANNELS * AUDIO_PROCESS_BPS * 2) 
-#define AUDIO_PROCESS_OUT_RB_SIZE (AUDIO_PROCESS_BLOCK_SIZE * AUDIO_PROCESS_OUT_CHANNELS * AUDIO_PROCESS_BPS * 2) 
+#define AUDIO_PROCESS_IN_RB_SIZE (AUDIO_PROCESS_BLOCK_SIZE * AUDIO_PROCESS_IN_CHANNELS * AUDIO_PROCESS_BPS * 2)
+#define AUDIO_PROCESS_OUT_RB_SIZE (AUDIO_PROCESS_BLOCK_SIZE * AUDIO_PROCESS_OUT_CHANNELS * AUDIO_PROCESS_BPS * 2)
 
 static led_strip_handle_t led_strip;
 
@@ -51,24 +53,18 @@ void on_controls_change(float volume_factor)
 
 void app_main()
 {
-    /* Setting TinyUSB up */
-    const tinyusb_config_t tusb_cfg = {
-        .device_descriptor = NULL,
-        .string_descriptor = NULL,
-        .external_phy = false, // In the most cases you need to use a `false` value
-        .configuration_descriptor = NULL,
-    };
-    ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
+    // /* Setting TinyUSB up */
+    // const tinyusb_config_t tusb_cfg = {
+    //     .device_descriptor = NULL,
+    //     .string_descriptor = NULL,
+    //     .external_phy = false, // In the most cases you need to use a `false` value
+    //     .configuration_descriptor = NULL,
+    // };
+    // ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
 
-    tinyusb_config_cdcacm_t acm_cfg = {0}; // the configuration uses default values
-    ESP_ERROR_CHECK(tusb_cdc_acm_init(&acm_cfg));
-    esp_tusb_init_console(TINYUSB_CDC_ACM_0);
-
-    // esp_console_repl_config_t repl_config = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
-    // esp_console_dev_uart_config_t hw_config = ESP_CONSOLE_DEV_UART_CONFIG_DEFAULT();
-    // esp_console_repl_t* str_cons = NULL;
-    // ESP_ERROR_CHECK(esp_console_new_repl_uart(&hw_config, &repl_config, &str_cons));
-    // ESP_ERROR_CHECK(esp_console_start_repl(str_cons));
+    // tinyusb_config_cdcacm_t acm_cfg = {0}; // the configuration uses default values
+    // ESP_ERROR_CHECK(tusb_cdc_acm_init(&acm_cfg));
+    // esp_tusb_init_console(TINYUSB_CDC_ACM_0);
 
     configure_led();
 
@@ -84,13 +80,14 @@ void app_main()
         printf("Failed to create ringbuf!\n");
     }
 
-    // init_usb_audio(rb_in2trans);
-    // init_usb();
+    init_i2s_audio(rb_trans2out, IO_AUDIO_FREQ);
+
+    init_usb_audio(rb_in2trans);
+    init_usb();
 
     // TODO: use dsps_fft2r_sc16 for FFT
 
-    init_spi_receiver(rb_in2trans, on_controls_change);
-    init_i2s_audio(rb_trans2out, IO_AUDIO_FREQ);
+    // init_spi_receiver(rb_in2trans, on_controls_change);
     init_audio_transformer(rb_in2trans, rb_trans2out);
 
     led_strip_set_pixel(led_strip, 0, 0, 16, 0);

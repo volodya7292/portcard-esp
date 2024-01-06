@@ -1,4 +1,5 @@
 dependencies:
   espressif/led_strip: "^2.4.1"
   espressif/esp-dsp: "^1.4.9"
-  espressif/esp_tinyusb: "^1"
+  # espressif/esp_tinyusb: "^1"
+  tinyusb: "^0.15"
