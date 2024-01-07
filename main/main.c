@@ -22,11 +22,15 @@
 // double-buffered ring buffer sizes
 #define AUDIO_PROCESS_IN_RB_SIZE (AUDIO_PROCESS_BLOCK_SIZE * AUDIO_PROCESS_IN_CHANNELS * AUDIO_PROCESS_BPS * 2)
 #define AUDIO_PROCESS_OUT_RB_SIZE (AUDIO_PROCESS_BLOCK_SIZE * AUDIO_PROCESS_OUT_CHANNELS * AUDIO_PROCESS_BPS * 2)
+#define IS_DEBUG false
 
+#if IS_DEBUG
 static led_strip_handle_t led_strip;
+#endif
 
 static void configure_led(void)
 {
+#if IS_DEBUG
     led_strip_config_t strip_config = {
         .strip_gpio_num = BLINK_GPIO,
         .max_leds = 1, // at least one LED on board
@@ -37,13 +41,8 @@ static void configure_led(void)
         .flags.with_dma = true,
     };
     ESP_ERROR_CHECK(led_strip_new_spi_device(&strip_config, &spi_config, &led_strip));
-    led_strip_clear(led_strip);
-}
-
-void on_data_receive()
-{
-    led_strip_set_pixel(led_strip, 0, 16, 16, 16);
-    // led_strip_refresh(led_strip);
+    ESP_ERROR_CHECK(led_strip_clear(led_strip));
+#endif
 }
 
 void on_controls_change(float volume_factor)
@@ -85,34 +84,11 @@ void app_main()
     init_usb_audio(rb_in2trans);
     init_usb();
 
-    // TODO: use dsps_fft2r_sc16 for FFT
-
     // init_spi_receiver(rb_in2trans, on_controls_change);
     init_audio_transformer(rb_in2trans, rb_trans2out);
 
+#if IS_DEBUG
     led_strip_set_pixel(led_strip, 0, 0, 16, 0);
-    led_strip_refresh(led_strip);
-
-    // if (dsps_fft4r_init_fc32(NULL, 2048) != ESP_OK)
-    // {
-    //     return;
-    // }
-
-    // uint32_t t0 = esp_cpu_get_cycle_count();
-    // if (dsps_fft4r_fc32(test_data, 2048) != ESP_OK)
-    // {
-    //     return;
-    // }
-    // uint32_t t1 = esp_cpu_get_cycle_count();
-
-    // if (t1 - t0 < 160000)
-    // {
-    //     led_strip_set_pixel(led_strip, 0, 16, 0, 0);
-    //     led_strip_refresh(led_strip);
-    // } else {
-    //     led_strip_set_pixel(led_strip, 0, 16, 0, 16);
-    //     led_strip_refresh(led_strip);
-    // }
 
     while (1)
     {
@@ -122,4 +98,5 @@ void app_main()
         fprintf(stdout, "example: print -> stdout\n");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
+#endif
 }

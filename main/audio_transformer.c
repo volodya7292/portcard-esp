@@ -72,6 +72,7 @@ static void conv_worker(void *args)
         float *scratch;
         block_convoler_t *conv1;
         block_convoler_t *conv2;
+        float conv_norm_vol = conv_norm * m_volume_factor;
 
         if (tidx == 0)
         {
@@ -91,11 +92,11 @@ static void conv_worker(void *args)
             scratch[i << 1] = src[i];
             scratch[(i << 1) + 1] = 0.0f;
         }
-        dsps_mulc_f32_ansi(scratch, scratch, AUDIO_PROCESS_BLOCK_SIZE * 2, i16_norm, 2, 2);
+        dsps_mulc_f32(scratch, scratch, AUDIO_PROCESS_BLOCK_SIZE * 2, i16_norm, 2, 2);
         block_convolver_process(conv1, scratch);
         for (int i = 0; i < AUDIO_PROCESS_BLOCK_SIZE; i++)
         {
-            out_samples[i * OUT_CHANNELS + tidx] += scratch[i] * conv_norm;
+            out_samples[i * OUT_CHANNELS + tidx] += scratch[i] * conv_norm_vol;
         }
 
         for (int i = 0; i < AUDIO_PROCESS_BLOCK_SIZE * 2; i++)
@@ -103,11 +104,11 @@ static void conv_worker(void *args)
             scratch[i << 1] = src[i];
             scratch[(i << 1) + 1] = 0.0f;
         }
-        dsps_mulc_f32_ansi(scratch, scratch, AUDIO_PROCESS_BLOCK_SIZE * 2, i16_norm, 2, 2);
+        dsps_mulc_f32(scratch, scratch, AUDIO_PROCESS_BLOCK_SIZE * 2, i16_norm, 2, 2);
         block_convolver_process(conv2, scratch);
         for (int i = 0; i < AUDIO_PROCESS_BLOCK_SIZE; i++)
         {
-            out_samples[i * OUT_CHANNELS + tidx] += scratch[i] * conv_norm;
+            out_samples[i * OUT_CHANNELS + tidx] += scratch[i] * conv_norm_vol;
         }
 
         xEventGroupSetBits(working, 1 << (tidx + 2));
@@ -132,13 +133,6 @@ static void do_process()
         {
             curr_block[i] = in_samples[i * IN_CHANNELS + ch];
         }
-    }
-
-    // Adjust volume
-    for (int ch = 0; ch < SLIDING_CHANNELS; ch++)
-    {
-        int16_t *curr_block = get_sliding_block(ch) + AUDIO_PROCESS_BLOCK_SIZE;
-        dsps_mulc_s16(curr_block, curr_block, AUDIO_PROCESS_BLOCK_SIZE, vol_i16, 1, 1);
     }
 
     memset(out_samples, 0, OUT_CHANNELS * AUDIO_PROCESS_BLOCK_SIZE * sizeof(out_samples[0]));
