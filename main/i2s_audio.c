@@ -5,9 +5,9 @@
 #include <memory.h>
 
 #define I2S_POWER_PIN GPIO_NUM_9
-#define I2S_BCLK_IO1 GPIO_NUM_1
-#define I2S_WS_IO1 GPIO_NUM_2
-#define I2S_DOUT_IO1 GPIO_NUM_4
+#define I2S_BCLK_IO1 GPIO_NUM_6
+#define I2S_WS_IO1 GPIO_NUM_8
+#define I2S_DOUT_IO1 GPIO_NUM_7
 #define I2S_BUFF_SIZE 1024
 
 static uint32_t m_output_freq = 0;
