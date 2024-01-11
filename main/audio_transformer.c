@@ -68,7 +68,8 @@ static void conv_worker(void *args)
     {
         xEventGroupWaitBits(working, 1 << tidx, pdTRUE, pdTRUE, portMAX_DELAY);
 
-        int16_t *src = get_sliding_block(tidx);
+        int16_t *src_ch0 = get_sliding_block(0);
+        int16_t *src_ch1 = get_sliding_block(1);
         float *scratch;
         block_convoler_t *conv1;
         block_convoler_t *conv2;
@@ -89,7 +90,7 @@ static void conv_worker(void *args)
 
         for (int i = 0; i < AUDIO_PROCESS_BLOCK_SIZE * 2; i++)
         {
-            scratch[i << 1] = src[i];
+            scratch[i << 1] = src_ch0[i];
             scratch[(i << 1) + 1] = 0.0f;
         }
         dsps_mulc_f32(scratch, scratch, AUDIO_PROCESS_BLOCK_SIZE * 2, i16_norm, 2, 2);
@@ -101,7 +102,7 @@ static void conv_worker(void *args)
 
         for (int i = 0; i < AUDIO_PROCESS_BLOCK_SIZE * 2; i++)
         {
-            scratch[i << 1] = src[i];
+            scratch[i << 1] = src_ch1[i];
             scratch[(i << 1) + 1] = 0.0f;
         }
         dsps_mulc_f32(scratch, scratch, AUDIO_PROCESS_BLOCK_SIZE * 2, i16_norm, 2, 2);
