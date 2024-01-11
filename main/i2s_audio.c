@@ -4,10 +4,10 @@
 #include <math.h>
 #include <memory.h>
 
-#define I2S_POWER_PIN GPIO_NUM_9
-#define I2S_BCLK_IO1 GPIO_NUM_6
-#define I2S_WS_IO1 GPIO_NUM_8
-#define I2S_DOUT_IO1 GPIO_NUM_7
+#define I2S_BCLK_IO1 GPIO_NUM_35
+#define I2S_WS_IO1 GPIO_NUM_33
+#define I2S_DOUT_IO1 GPIO_NUM_34
+#define I2S_UNMUTE_PIN GPIO_NUM_18
 #define I2S_BUFF_SIZE 1024
 
 static uint32_t m_output_freq = 0;
@@ -83,12 +83,12 @@ void init_i2s_audio(RingbufHandle_t in_buf, uint32_t output_freq)
     gpio_config_t io_conf = {
         .intr_type = GPIO_INTR_DISABLE,
         .mode = GPIO_MODE_OUTPUT,
-        .pin_bit_mask = BIT64(I2S_POWER_PIN),
+        .pin_bit_mask = BIT64(I2S_UNMUTE_PIN),
     };
 
     // Configure handshake line as output
     assert(gpio_config(&io_conf) == ESP_OK);
 
-    // Switch the power on
-    assert(gpio_set_level(I2S_POWER_PIN, 1) == ESP_OK);
+    // Unmute the DAC
+    assert(gpio_set_level(I2S_UNMUTE_PIN, 1) == ESP_OK);
 }

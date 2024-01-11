@@ -1,6 +1,6 @@
 # portcard-esp
 
-A portable surround-sound card implementation using ESP32-S3 and a UDA1334A DAC.
+A portable surround-sound card implementation using ESP32-S3 and a PCM5102 DAC.
 Uses USB UAC2 to receive multi-channel sound and convolves it into two channels that are then sent to the DAC.
 
 ## Building
