@@ -13,10 +13,12 @@
 #define NUM_WINDOWS 2
 #define TOTAL_CH_SAMPLES (IN_CHANNELS * PACKET_SAMPLES)
 #define IN_PACKET_SIZE (IN_CHANNELS * PACKET_SAMPLES * AUDIO_PROCESS_BPS)
+// volume compensation for convolution
+#define VOL_COMPENSATION 1.3
 
 static RingbufHandle_t m_in_rb = NULL;
 static RingbufHandle_t m_out_rb = NULL;
-static volatile float m_volume_factor = 1.0;
+static atomic_uint_fast32_t m_volume_factor_f32 = 0;
 static block_convoler_t fl_left_conv;
 static block_convoler_t fl_right_conv;
 static block_convoler_t fr_left_conv;
@@ -73,7 +75,11 @@ static void conv_worker(void *args)
         float *scratch;
         block_convoler_t *conv1;
         block_convoler_t *conv2;
-        float conv_norm_vol = conv_norm * m_volume_factor;
+
+        float m_volume_factor;
+        memcpy(&m_volume_factor, &m_volume_factor_f32, sizeof(float));
+
+        float conv_norm_vol = conv_norm * m_volume_factor * VOL_COMPENSATION;
 
         if (tidx == 0)
         {
@@ -118,8 +124,6 @@ static void conv_worker(void *args)
 
 static void do_process()
 {
-    int16_t vol_i16 = m_volume_factor * 32767;
-
     // Slide windows for overlap-save
     for (int ch = 0; ch < SLIDING_CHANNELS; ch++)
     {
@@ -235,5 +239,7 @@ void init_audio_transformer(RingbufHandle_t in_buf, RingbufHandle_t out_buf)
 
 void audio_transformer_set_volume(float volume_factor)
 {
-    m_volume_factor = volume_factor;
+    uint32_t var;
+    memcpy(&var, &volume_factor, sizeof(float));
+    atomic_store(&m_volume_factor_f32, var);
 }
