@@ -7,7 +7,7 @@
 #define AUDIO_SAMPLE_RATE CFG_TUD_AUDIO_FUNC_1_MAX_SAMPLE_RATE
 #define USB_AUDIO_SAMPLE_RATE AUDIO_SAMPLE_RATE
 // Corrects for distorions at high volumes
-#define VOLUME_CORRECTION 0.9
+#define VOLUME_CORRECTION 0.95
 
 // enum
 // {
