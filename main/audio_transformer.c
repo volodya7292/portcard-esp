@@ -225,7 +225,7 @@ void init_audio_transformer(RingbufHandle_t in_buf, RingbufHandle_t out_buf)
     // assert(dsps_fft2r_init_fc32(NULL, CONFIG_DSP_MAX_FFT_SIZE) == ESP_OK);
     // assert(dsps_fft4r_init_fc32(NULL, CONFIG_DSP_MAX_FFT_SIZE) == ESP_OK);
 
-    xTaskCreate(transformer_task, "transformer_task", 2048, NULL, 3, NULL);
+    xTaskCreate(transformer_task, "transformer_task", 2048, NULL, 2, NULL);
     xTaskCreatePinnedToCore(conv_worker, "conv_worker0", 2048, &tidx_arr[0], 2, NULL, tidx_core[0]);
     xTaskCreatePinnedToCore(conv_worker, "conv_worker1", 2048, &tidx_arr[1], 2, NULL, tidx_core[1]);
 

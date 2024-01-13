@@ -67,7 +67,7 @@ tusb_desc_device_t const desc_device =
 uint8_t const desc_configuration[CONFIG_TOTAL_LEN] =
 {
     // Config number, interface count, string index, total length, attribute, power in mA
-    TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, 0x00, 100),
+    TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, 0x00, 150),
 
     TUD_AUDIO_CONVERTER_DESCRIPTOR(2, EPNUM_AUDIO_OUT),
 

@@ -78,7 +78,7 @@ void init_i2s_audio(RingbufHandle_t in_buf, uint32_t output_freq)
     m_output_freq = output_freq;
 
     i2s_init_std_simplex();
-    xTaskCreate(i2s_write_task, "i2s_write_task", 1024, NULL, 3, NULL);
+    xTaskCreate(i2s_write_task, "i2s_write_task", 1024, NULL, 2, NULL);
 
     gpio_config_t io_conf = {
         .intr_type = GPIO_INTR_DISABLE,

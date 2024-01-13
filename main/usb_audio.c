@@ -85,7 +85,7 @@ static bool tud_audio_clock_set_request(uint8_t rhport, audio_control_request_t 
     {
         TU_LOG1("Clock set request not supported, entity = %u, selector = %u, request = %u\r\n",
                 request->bEntityID, request->bControlSelector, request->bRequest);
-        return false;
+        return true;
     }
 }
 
@@ -165,7 +165,7 @@ static bool tud_audio_feature_unit_set_request(uint8_t rhport, audio_control_req
     {
         TU_LOG1("Feature unit set request not supported, entity = %u, selector = %u, request = %u\r\n",
                 request->bEntityID, request->bControlSelector, request->bRequest);
-        return false;
+        return true;
     }
 }
 
@@ -238,7 +238,7 @@ bool tud_audio_rx_done_pre_read_cb(uint8_t rhport, uint16_t n_bytes_received, ui
 {
     if (m_out_buf == NULL)
     {
-        return false;
+        return true;
     }
 
     uint32_t usb_spk_data_size = tud_audio_read(spk_buf, n_bytes_received);
