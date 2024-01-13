@@ -25,7 +25,7 @@
 //     VOLUME_CTRL_SILENCE = 0x8000,
 // };
 
-const int16_t USB_VOL_MIN = -12800; // -50db
+const int16_t USB_VOL_MIN = -15360; // -60db
 const int16_t USB_VOL_MAX = 0;
 const int16_t USB_VOL_RES = 256;
 
