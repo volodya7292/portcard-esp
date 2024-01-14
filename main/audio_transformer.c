@@ -14,7 +14,7 @@
 #define TOTAL_CH_SAMPLES (IN_CHANNELS * PACKET_SAMPLES)
 #define IN_PACKET_SIZE (IN_CHANNELS * PACKET_SAMPLES * AUDIO_PROCESS_BPS)
 // volume compensation for convolution
-#define VOL_COMPENSATION 1.6
+#define VOL_COMPENSATION 4
 
 static RingbufHandle_t m_in_rb = NULL;
 static RingbufHandle_t m_out_rb = NULL;
