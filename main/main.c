@@ -14,6 +14,8 @@
 #include "audio_transformer.h"
 #include "driver/spi_common.h"
 #include "spi_receiver.h"
+#include "nvs_flash.h"
+#include "resources.h"
 // #include "esp_console.h"
 
 #define IO_AUDIO_FREQ 48000
@@ -24,13 +26,10 @@
 #define AUDIO_PROCESS_OUT_RB_SIZE (AUDIO_PROCESS_BLOCK_SIZE * AUDIO_PROCESS_OUT_CHANNELS * AUDIO_PROCESS_BPS * 2)
 #define IS_DEBUG false
 
-#if IS_DEBUG
 static led_strip_handle_t led_strip;
-#endif
 
 static void configure_led(void)
 {
-#if IS_DEBUG
     led_strip_config_t strip_config = {
         .strip_gpio_num = BLINK_GPIO,
         .max_leds = 1, // at least one LED on board
@@ -42,7 +41,6 @@ static void configure_led(void)
     };
     ESP_ERROR_CHECK(led_strip_new_spi_device(&strip_config, &spi_config, &led_strip));
     ESP_ERROR_CHECK(led_strip_clear(led_strip));
-#endif
 }
 
 void on_controls_change(float volume_factor)
@@ -65,7 +63,46 @@ void app_main()
     // ESP_ERROR_CHECK(tusb_cdc_acm_init(&acm_cfg));
     // esp_tusb_init_console(TINYUSB_CDC_ACM_0);
 
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
+        // NVS partition was truncated and needs to be erased
+        // Retry nvs_flash_init
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(err);
+
+    nvs_handle_t nvs_handle;
+    err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    ESP_ERROR_CHECK(err);
+
+    int32_t restart_counter = 0;
+    err = nvs_get_i32(nvs_handle, "restart_counter", &restart_counter);
+
+    restart_counter++;
+    err = nvs_set_i32(nvs_handle, "restart_counter", restart_counter);
+
+    // ------------------------------------------------------------------------------------------
+
     configure_led();
+
+    const uint8_t *fl_wav_start;
+    const uint8_t *fr_wav_start;
+
+    if (restart_counter % 2 == 0)
+    {
+        led_strip_set_pixel(led_strip, 0, 8, 8, 8);
+        fl_wav_start = ___res_FL_MODE1_wav_start;
+        fr_wav_start = ___res_FR_MODE1_wav_start;
+    }
+    else
+    {
+        led_strip_set_pixel(led_strip, 0, 0, 8, 0);
+        fl_wav_start = ___res_FL_MODE2_wav_start;
+        fr_wav_start = ___res_FR_MODE2_wav_start;
+    }
+    led_strip_refresh(led_strip);
 
     RingbufHandle_t rb_in2trans = xRingbufferCreate(AUDIO_PROCESS_IN_RB_SIZE, RINGBUF_TYPE_BYTEBUF);
     if (rb_in2trans == NULL)
@@ -85,18 +122,16 @@ void app_main()
     init_usb();
 
     // init_spi_receiver(rb_in2trans, on_controls_change);
-    init_audio_transformer(rb_in2trans, rb_trans2out);
+    init_audio_transformer(rb_in2trans, rb_trans2out, fl_wav_start, fr_wav_start);
 
 #if IS_DEBUG
     led_strip_set_pixel(led_strip, 0, 0, 16, 0);
+#endif
 
     while (1)
     {
-        // led_strip_set_pixel(led_strip, 0, 0, 16, 0);
         led_strip_refresh(led_strip);
-        printf("init\n");
         fprintf(stdout, "example: print -> stdout\n");
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(250 / portTICK_PERIOD_MS);
     }
-#endif
 }

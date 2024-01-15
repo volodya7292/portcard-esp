@@ -2,7 +2,7 @@
 #include <memory.h>
 #include <math.h>
 #include "esp_dsp.h"
-#include "resources.h"
+#include "wav.h"
 #include "block_convoler.h"
 #include "esp_psram.h"
 #include "stdatomic.h"
@@ -14,7 +14,7 @@
 #define TOTAL_CH_SAMPLES (IN_CHANNELS * PACKET_SAMPLES)
 #define IN_PACKET_SIZE (IN_CHANNELS * PACKET_SAMPLES * AUDIO_PROCESS_BPS)
 // volume compensation for convolution
-#define VOL_COMPENSATION 4
+#define VOL_COMPENSATION 3.5
 
 static RingbufHandle_t m_in_rb = NULL;
 static RingbufHandle_t m_out_rb = NULL;
@@ -163,7 +163,7 @@ static void transformer_task(void *args)
     vTaskDelete(NULL);
 }
 
-void init_audio_transformer(RingbufHandle_t in_buf, RingbufHandle_t out_buf)
+void init_audio_transformer(RingbufHandle_t in_buf, RingbufHandle_t out_buf, const uint8_t* fl_wav_start, const uint8_t* fr_wav_start)
 {
     m_in_rb = in_buf;
     m_out_rb = out_buf;
@@ -179,9 +179,9 @@ void init_audio_transformer(RingbufHandle_t in_buf, RingbufHandle_t out_buf)
     // }
 
     wav_data_t fl_data;
-    parse_wav(___res_FL_wav_start, &fl_data);
+    parse_wav(fl_wav_start, &fl_data);
     wav_data_t fr_data;
-    parse_wav(___res_FR_wav_start, &fr_data);
+    parse_wav(fr_wav_start, &fr_data);
 
     int16_t *temp = heap_caps_malloc(fl_data.channel_size, MALLOC_CAP_SPIRAM);
     for (int i = 0; i < fl_data.num_samples; i++)
