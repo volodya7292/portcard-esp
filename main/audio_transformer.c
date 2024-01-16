@@ -13,8 +13,8 @@
 #define NUM_WINDOWS 2
 #define TOTAL_CH_SAMPLES (IN_CHANNELS * PACKET_SAMPLES)
 #define IN_PACKET_SIZE (IN_CHANNELS * PACKET_SAMPLES * AUDIO_PROCESS_BPS)
-// volume compensation for convolution
-#define VOL_COMPENSATION 3.5
+// volume compensation for convolution (0.5 accounts for two speakers crosstalk)
+#define VOL_COMPENSATION (0.5 * 0.5)
 
 static RingbufHandle_t m_in_rb = NULL;
 static RingbufHandle_t m_out_rb = NULL;
@@ -34,6 +34,12 @@ static float *conv_scratch2;
 
 static uint32_t tidx_arr[2] = {0, 1};
 static uint32_t tidx_core[2] = {0, 1};
+
+static float clamp(float d, float min, float max)
+{
+    const float t = d < min ? min : d;
+    return t > max ? max : t;
+}
 
 static int16_t *get_sliding_block(uint32_t ch)
 {
@@ -63,8 +69,9 @@ static void conv_worker(void *args)
     uint32_t tidx = ((uint32_t *)args)[0];
 
     float i16_max = 32767.0f;
-    float i16_norm = 1.0f / i16_max;
-    float conv_norm = 1.0f / 2.0f * i16_max;
+    float i16_norm = 1.0f / (i16_max + 1);
+
+    float *inner_out = heap_caps_aligned_alloc(16, AUDIO_PROCESS_BLOCK_SIZE * sizeof(float), MALLOC_CAP_INTERNAL);
 
     while (1)
     {
@@ -79,7 +86,7 @@ static void conv_worker(void *args)
         float m_volume_factor;
         memcpy(&m_volume_factor, &m_volume_factor_f32, sizeof(float));
 
-        float conv_norm_vol = conv_norm * m_volume_factor * VOL_COMPENSATION;
+        float conv_norm_vol = i16_max * m_volume_factor * VOL_COMPENSATION;
 
         if (tidx == 0)
         {
@@ -100,11 +107,12 @@ static void conv_worker(void *args)
             scratch[(i << 1) + 1] = 0.0f;
         }
         dsps_mulc_f32(scratch, scratch, AUDIO_PROCESS_BLOCK_SIZE * 2, i16_norm, 2, 2);
+
         block_convolver_process(conv1, scratch);
-        for (int i = 0; i < AUDIO_PROCESS_BLOCK_SIZE; i++)
-        {
-            out_samples[i * OUT_CHANNELS + tidx] += scratch[i] * conv_norm_vol;
-        }
+
+        memcpy(inner_out, scratch, AUDIO_PROCESS_BLOCK_SIZE * sizeof(float));
+
+        // ------------------------------------------------------
 
         for (int i = 0; i < AUDIO_PROCESS_BLOCK_SIZE * 2; i++)
         {
@@ -112,10 +120,16 @@ static void conv_worker(void *args)
             scratch[(i << 1) + 1] = 0.0f;
         }
         dsps_mulc_f32(scratch, scratch, AUDIO_PROCESS_BLOCK_SIZE * 2, i16_norm, 2, 2);
+
         block_convolver_process(conv2, scratch);
+
+        dsps_add_f32(inner_out, scratch, inner_out, AUDIO_PROCESS_BLOCK_SIZE, 1, 1, 1);
+
+        // ------------------------------------------------------
+
         for (int i = 0; i < AUDIO_PROCESS_BLOCK_SIZE; i++)
         {
-            out_samples[i * OUT_CHANNELS + tidx] += scratch[i] * conv_norm_vol;
+            out_samples[i * OUT_CHANNELS + tidx] += clamp(inner_out[i] * conv_norm_vol, -i16_max, i16_max);
         }
 
         xEventGroupSetBits(working, 1 << (tidx + 2));
@@ -163,7 +177,7 @@ static void transformer_task(void *args)
     vTaskDelete(NULL);
 }
 
-void init_audio_transformer(RingbufHandle_t in_buf, RingbufHandle_t out_buf, const uint8_t* fl_wav_start, const uint8_t* fr_wav_start)
+void init_audio_transformer(RingbufHandle_t in_buf, RingbufHandle_t out_buf, const uint8_t *fl_wav_start, const uint8_t *fr_wav_start)
 {
     m_in_rb = in_buf;
     m_out_rb = out_buf;

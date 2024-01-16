@@ -18,9 +18,6 @@ static bool is_pow_of_two(uint32_t v)
 
 static void inverse_fft_f32(float *data, uint32_t n)
 {
-    float norm = 1.0f / n;
-    assert(dsps_mulc_f32(data, data, n * 2, norm, 1, 1) == ESP_OK);
-
     for (int i = 1; i < n * 2; i += 2)
     {
         data[i] = -data[i];
@@ -33,6 +30,9 @@ static void inverse_fft_f32(float *data, uint32_t n)
     {
         data[i] = -data[i];
     }
+
+    float norm = 1.0f / n;
+    assert(dsps_mulc_f32(data, data, n * 2, norm, 1, 1) == ESP_OK);
 }
 
 /// @param scratch a 16-byte aligned buffer of `samples_per_block * 16` bytes
@@ -49,7 +49,7 @@ void block_convolver_init(block_convoler_t *convolver, float *scratch, uint32_t 
     float **sliding_signal_fft = malloc(num_blocks * sizeof(void *));
 
     float i16_max = 32767;
-    float norm_i16 = 1.0 / i16_max;
+    float norm_i16 = 1.0 / (i16_max + 1);
 
     for (int block_idx = 0; block_idx < num_blocks; block_idx++)
     {
