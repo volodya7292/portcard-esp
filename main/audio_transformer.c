@@ -14,7 +14,7 @@
 #define TOTAL_CH_SAMPLES (IN_CHANNELS * PACKET_SAMPLES)
 #define IN_PACKET_SIZE (IN_CHANNELS * PACKET_SAMPLES * AUDIO_PROCESS_BPS)
 // volume compensation for convolution (0.5 accounts for two speakers crosstalk)
-#define VOL_COMPENSATION (0.5 * 1.0)
+#define VOL_COMPENSATION (0.5 * 1.5)
 
 static RingbufHandle_t m_in_rb = NULL;
 static RingbufHandle_t m_out_rb = NULL;
@@ -166,11 +166,11 @@ static void transformer_task(void *args)
     {
         receive_full_buffer();
 
-        uint32_t t0 = esp_cpu_get_cycle_count();
+        // uint32_t t0 = esp_cpu_get_cycle_count();
         do_process();
-        uint32_t t1 = esp_cpu_get_cycle_count();
+        // uint32_t t1 = esp_cpu_get_cycle_count();
 
-        printf("TT2: %lu\n", t1 - t0);
+        // printf("TT2: %lu\n", t1 - t0);
         xRingbufferSend(m_out_rb, out_samples, sizeof(out_samples), 0);
     }
 

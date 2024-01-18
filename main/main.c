@@ -131,7 +131,6 @@ void app_main()
     while (1)
     {
         led_strip_refresh(led_strip);
-        fprintf(stdout, "example: print -> stdout\n");
         vTaskDelay(250 / portTICK_PERIOD_MS);
     }
 }
