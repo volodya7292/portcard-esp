@@ -248,7 +248,7 @@ bool tud_audio_rx_done_pre_read_cb(uint8_t rhport, uint16_t n_bytes_received, ui
     uint32_t buf_avail = (xRingbufferGetCurFreeSize(m_out_buf) >> 2) << 2; 
     if (buf_avail < usb_spk_data_size) {
         size_t _sz;
-        xRingbufferReceiveUpTo(m_out_buf, &_sz, 0, ((usb_spk_data_size - buf_avail) << 1) >> 1);
+        xRingbufferReceiveUpTo(m_out_buf, &_sz, 0, usb_spk_data_size - buf_avail);
     }
 
     xRingbufferSend(m_out_buf, spk_buf, usb_spk_data_size, 0);
