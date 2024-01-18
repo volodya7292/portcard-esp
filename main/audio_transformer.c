@@ -14,7 +14,7 @@
 #define TOTAL_CH_SAMPLES (IN_CHANNELS * PACKET_SAMPLES)
 #define IN_PACKET_SIZE (IN_CHANNELS * PACKET_SAMPLES * AUDIO_PROCESS_BPS)
 // volume compensation for convolution (0.5 accounts for two speakers crosstalk)
-#define VOL_COMPENSATION (0.5 * 0.5)
+#define VOL_COMPENSATION (0.5 * 1.0)
 
 static RingbufHandle_t m_in_rb = NULL;
 static RingbufHandle_t m_out_rb = NULL;
@@ -239,9 +239,9 @@ void init_audio_transformer(RingbufHandle_t in_buf, RingbufHandle_t out_buf, con
     // assert(dsps_fft2r_init_fc32(NULL, CONFIG_DSP_MAX_FFT_SIZE) == ESP_OK);
     // assert(dsps_fft4r_init_fc32(NULL, CONFIG_DSP_MAX_FFT_SIZE) == ESP_OK);
 
-    xTaskCreate(transformer_task, "transformer_task", 2048, NULL, 2, NULL);
-    xTaskCreatePinnedToCore(conv_worker, "conv_worker0", 2048, &tidx_arr[0], 2, NULL, tidx_core[0]);
-    xTaskCreatePinnedToCore(conv_worker, "conv_worker1", 2048, &tidx_arr[1], 2, NULL, tidx_core[1]);
+    xTaskCreate(transformer_task, "transformer_task", 2048, NULL, 1, NULL);
+    xTaskCreatePinnedToCore(conv_worker, "conv_worker0", 2048, &tidx_arr[0], 1, NULL, tidx_core[0]);
+    xTaskCreatePinnedToCore(conv_worker, "conv_worker1", 2048, &tidx_arr[1], 1, NULL, tidx_core[1]);
 
     // while (1)
     // {

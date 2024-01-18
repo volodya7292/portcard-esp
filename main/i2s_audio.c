@@ -40,7 +40,7 @@ static void i2s_init_std_simplex()
 
 static void i2s_write_task(void *args)
 {
-    uint8_t *w_buf = (uint8_t *)calloc(1, I2S_BUFF_SIZE);
+    int16_t *w_buf = (int16_t *)calloc(sizeof(int16_t), I2S_BUFF_SIZE);
     assert(w_buf); // Check if w_buf allocation success
 
     // TODO
@@ -56,12 +56,15 @@ static void i2s_write_task(void *args)
     while (1)
     {
         size_t received_size = 0;
-        // void* bytes = xRingbufferReceive(m_in_rb, &received_size, portMAX_DELAY);
-        void *bytes = xRingbufferReceiveUpTo(m_in_rb, &received_size, portMAX_DELAY, I2S_BUFF_SIZE);
-        memcpy(w_buf, bytes, received_size);
+        int16_t *bytes = xRingbufferReceiveUpTo(m_in_rb, &received_size, portMAX_DELAY, I2S_BUFF_SIZE * sizeof(int16_t));
+        uint32_t received_samples = received_size / sizeof(int16_t) / 2; // a sample has two values for two channels
+
+        uint32_t w_buf_avail = received_samples * sizeof(int16_t) * 2; // rounds byte count to two channels
+        memcpy(w_buf, bytes, w_buf_avail);
+        
         vRingbufferReturnItem(m_in_rb, bytes);
 
-        if (i2s_channel_write(tx_chan, w_buf, received_size, NULL, portMAX_DELAY) != ESP_OK)
+        if (i2s_channel_write(tx_chan, w_buf, w_buf_avail, NULL, portMAX_DELAY) != ESP_OK)
         {
             // printf("Write Task: i2s write %d bytes\n", w_bytes);
             printf("Write Task: i2s write failed\n");
@@ -78,7 +81,7 @@ void init_i2s_audio(RingbufHandle_t in_buf, uint32_t output_freq)
     m_output_freq = output_freq;
 
     i2s_init_std_simplex();
-    xTaskCreate(i2s_write_task, "i2s_write_task", 1024, NULL, 3, NULL);
+    xTaskCreate(i2s_write_task, "i2s_write_task", 1024, NULL, 2, NULL);
 
     gpio_config_t io_conf = {
         .intr_type = GPIO_INTR_DISABLE,
