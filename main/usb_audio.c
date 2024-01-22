@@ -29,7 +29,7 @@ const int16_t USB_VOL_MIN = -15360; // -60db
 const int16_t USB_VOL_MAX = 0;
 const int16_t USB_VOL_RES = 256;
 
-static RingbufHandle_t m_out_buf = NULL;
+static ring_buffer_t* m_out_buf = NULL;
 
 static uint8_t spk_buf[CFG_TUD_AUDIO_FUNC_1_EP_OUT_SW_BUF_SZ];
 static int8_t usb_mute[CFG_TUD_AUDIO_FUNC_1_N_CHANNELS_RX + 1];    // +1 for master channel 0
@@ -243,22 +243,12 @@ bool tud_audio_rx_done_pre_read_cb(uint8_t rhport, uint16_t n_bytes_received, ui
 
     uint32_t usb_spk_data_size = tud_audio_read(spk_buf, n_bytes_received);
 
-    // Free up space if needed
-    // align down to sizeof(int16_t)*2 for stereo consistency
-    uint32_t buf_avail = (xRingbufferGetCurFreeSize(m_out_buf) >> 2) << 2;
-    if (buf_avail < usb_spk_data_size)
-    {
-        size_t _sz;
-        void *ptr = xRingbufferReceiveUpTo(m_out_buf, &_sz, 0, usb_spk_data_size - buf_avail);
-        vRingbufferReturnItem(m_out_buf, ptr);
-    }
-
-    xRingbufferSend(m_out_buf, spk_buf, usb_spk_data_size, 0);
+    ring_buffer_push(m_out_buf, spk_buf, usb_spk_data_size);
 
     return true;
 }
 
-void init_usb_audio(RingbufHandle_t out_buf)
+void init_usb_audio(ring_buffer_t* out_buf)
 {
     m_out_buf = out_buf;
 }

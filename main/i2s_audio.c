@@ -3,15 +3,16 @@
 #include "driver/gpio.h"
 #include <math.h>
 #include <memory.h>
+#include "freertos/task.h"
 
 #define I2S_BCLK_IO1 GPIO_NUM_35
 #define I2S_WS_IO1 GPIO_NUM_33
 #define I2S_DOUT_IO1 GPIO_NUM_34
 #define I2S_UNMUTE_PIN GPIO_NUM_18
-#define I2S_BUFF_SIZE 1024
+#define I2S_BUFF_SIZE (256 * sizeof(int16_t))
 
 static uint32_t m_output_freq = 0;
-static RingbufHandle_t m_in_rb = NULL;
+static ring_buffer_t* m_in_rb = NULL;
 static i2s_chan_handle_t tx_chan = NULL;
 
 static void i2s_init_std_simplex()
@@ -40,7 +41,7 @@ static void i2s_init_std_simplex()
 
 static void i2s_write_task(void *args)
 {
-    int16_t *w_buf = (int16_t *)calloc(sizeof(int16_t), I2S_BUFF_SIZE);
+    int16_t *w_buf = (int16_t *)malloc(I2S_BUFF_SIZE);
     assert(w_buf); // Check if w_buf allocation success
 
     // TODO
@@ -55,14 +56,12 @@ static void i2s_write_task(void *args)
 
     while (1)
     {
-        size_t received_size = 0;
-        int16_t *bytes = xRingbufferReceiveUpTo(m_in_rb, &received_size, portMAX_DELAY, I2S_BUFF_SIZE * sizeof(int16_t));
-        uint32_t received_samples = received_size / sizeof(int16_t) / 2; // a sample has two values for two channels
-
-        uint32_t w_buf_avail = received_samples * sizeof(int16_t) * 2; // rounds byte count to two channels
-        memcpy(w_buf, bytes, w_buf_avail);
-        
-        vRingbufferReturnItem(m_in_rb, bytes);
+        bool succ = ring_buffer_pull(m_in_rb, (uint8_t*)w_buf, I2S_BUFF_SIZE);
+        if (!succ) {
+            vTaskDelay(1);
+            continue;
+        }
+        uint32_t w_buf_avail = I2S_BUFF_SIZE;
 
         if (i2s_channel_write(tx_chan, w_buf, w_buf_avail, NULL, portMAX_DELAY) != ESP_OK)
         {
@@ -75,7 +74,7 @@ static void i2s_write_task(void *args)
     vTaskDelete(NULL);
 }
 
-void init_i2s_audio(RingbufHandle_t in_buf, uint32_t output_freq)
+void init_i2s_audio(ring_buffer_t* in_buf, uint32_t output_freq)
 {
     m_in_rb = in_buf;
     m_output_freq = output_freq;

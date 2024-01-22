@@ -1,3 +1,3 @@
-#include "freertos/ringbuf.h"
+#include "ring.h"
 
-void init_usb_audio(RingbufHandle_t out_buf);
+void init_usb_audio(ring_buffer_t* out_buf);

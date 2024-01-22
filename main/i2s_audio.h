@@ -1,3 +1,3 @@
-#include "freertos/ringbuf.h"
+#include "ring.h"
 
-void init_i2s_audio(RingbufHandle_t in_buf, uint32_t freq);
+void init_i2s_audio(ring_buffer_t* in_buf, uint32_t freq);

@@ -16,8 +16,8 @@
 // volume compensation for convolution (0.5 accounts for two speakers crosstalk)
 #define VOL_COMPENSATION (0.5 * 1.5)
 
-static RingbufHandle_t m_in_rb = NULL;
-static RingbufHandle_t m_out_rb = NULL;
+static ring_buffer_t* m_in_rb = NULL;
+static ring_buffer_t* m_out_rb = NULL;
 static atomic_uint_fast32_t m_volume_factor_f32 = 0;
 static block_convoler_t fl_left_conv;
 static block_convoler_t fl_right_conv;
@@ -51,16 +51,14 @@ static void receive_full_buffer()
 {
     uint32_t left_to_receive = sizeof(in_samples);
 
-    while (left_to_receive > 0)
+    while (1)
     {
-        size_t received_size = 0;
-        void *bytes = xRingbufferReceiveUpTo(m_in_rb, &received_size, portMAX_DELAY, left_to_receive);
+        bool succ = ring_buffer_pull(m_in_rb, (uint8_t*)in_samples, sizeof(in_samples));
+        if (succ) {
+            break;
+        }
 
-        uint32_t dst_offset = sizeof(in_samples) - left_to_receive;
-        memcpy((uint8_t *)in_samples + dst_offset, bytes, received_size);
-
-        left_to_receive -= received_size;
-        vRingbufferReturnItem(m_in_rb, bytes);
+        vTaskDelay(1);
     }
 }
 
@@ -171,13 +169,14 @@ static void transformer_task(void *args)
         // uint32_t t1 = esp_cpu_get_cycle_count();
 
         // printf("TT2: %lu\n", t1 - t0);
-        xRingbufferSend(m_out_rb, out_samples, sizeof(out_samples), 0);
+
+        ring_buffer_push(m_out_rb, (uint8_t*)out_samples, sizeof(out_samples));
     }
 
     vTaskDelete(NULL);
 }
 
-void init_audio_transformer(RingbufHandle_t in_buf, RingbufHandle_t out_buf, const uint8_t *fl_wav_start, const uint8_t *fr_wav_start)
+void init_audio_transformer(ring_buffer_t* in_buf, ring_buffer_t* out_buf, const uint8_t *fl_wav_start, const uint8_t *fr_wav_start)
 {
     m_in_rb = in_buf;
     m_out_rb = out_buf;
