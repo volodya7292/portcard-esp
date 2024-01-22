@@ -9,15 +9,25 @@
 #define I2S_WS_IO1 GPIO_NUM_33
 #define I2S_DOUT_IO1 GPIO_NUM_34
 #define I2S_UNMUTE_PIN GPIO_NUM_18
-#define I2S_BUFF_SIZE (256 * sizeof(int16_t))
+#define I2S_FULL_SAMPLE_SIZE (sizeof(int16_t) * 2) // 16bit * two channels
+#define I2S_DMA_FRAMES 480
+#define I2S_BUFF_SIZE (I2S_DMA_FRAMES * I2S_FULL_SAMPLE_SIZE)
 
 static uint32_t m_output_freq = 0;
-static ring_buffer_t* m_in_rb = NULL;
+static ring_buffer_t *m_in_rb = NULL;
 static i2s_chan_handle_t tx_chan = NULL;
 
 static void i2s_init_std_simplex()
 {
-    i2s_chan_config_t tx_chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
+    i2s_chan_config_t tx_chan_cfg = {
+        .id = I2S_NUM_AUTO,
+        .role = I2S_ROLE_MASTER,
+        .dma_desc_num = 6,
+        .dma_frame_num = I2S_DMA_FRAMES,
+        .auto_clear = true,
+        .intr_priority = 0,
+    };
+
     ESP_ERROR_CHECK(i2s_new_channel(&tx_chan_cfg, &tx_chan, NULL));
 
     i2s_std_config_t tx_std_cfg = {
@@ -56,12 +66,12 @@ static void i2s_write_task(void *args)
 
     while (1)
     {
-        bool succ = ring_buffer_pull(m_in_rb, (uint8_t*)w_buf, I2S_BUFF_SIZE);
-        if (!succ) {
+        uint32_t w_buf_avail = ring_buffer_pull_up_to(m_in_rb, (uint8_t *)w_buf, I2S_FULL_SAMPLE_SIZE, I2S_BUFF_SIZE / I2S_FULL_SAMPLE_SIZE);
+        if (w_buf_avail == 0)
+        {
             vTaskDelay(1);
             continue;
         }
-        uint32_t w_buf_avail = I2S_BUFF_SIZE;
 
         if (i2s_channel_write(tx_chan, w_buf, w_buf_avail, NULL, portMAX_DELAY) != ESP_OK)
         {
@@ -74,7 +84,7 @@ static void i2s_write_task(void *args)
     vTaskDelete(NULL);
 }
 
-void init_i2s_audio(ring_buffer_t* in_buf, uint32_t output_freq)
+void init_i2s_audio(ring_buffer_t *in_buf, uint32_t output_freq)
 {
     m_in_rb = in_buf;
     m_output_freq = output_freq;

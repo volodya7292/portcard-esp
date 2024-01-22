@@ -109,4 +109,43 @@ static bool ring_buffer_pull(ring_buffer_t *buffer, uint8_t *data_out, uint32_t 
     return true;
 }
 
+/// @return number of read bytes.
+static uint32_t ring_buffer_pull_up_to(ring_buffer_t *buffer, uint8_t *data_out, uint32_t item_size, uint32_t n_items_max)
+{
+    uint32_t size = item_size * n_items_max;
+
+    xSemaphoreTake(buffer->mutex, portMAX_DELAY);
+
+    if (buffer->readable_size < item_size)
+    {
+        xSemaphoreGive(buffer->mutex);
+        return 0;
+    }
+
+    if (buffer->readable_size < size) {
+        // align size down to item_size
+        size = (buffer->readable_size / item_size) * item_size;
+    }
+
+    if (buffer->read_start_idx + size > buffer->capacity)
+    {
+        uint32_t first_half_size = buffer->capacity - buffer->read_start_idx;
+        uint32_t second_half_size = size - first_half_size;
+        // Read first half
+        memcpy(data_out, buffer->data + buffer->read_start_idx, first_half_size);
+        // Read second half
+        memcpy(data_out + first_half_size, buffer->data, second_half_size);
+    }
+    else
+    {
+        memcpy(data_out, buffer->data + buffer->read_start_idx, size);
+    }
+
+    buffer->read_start_idx = (buffer->read_start_idx + size) % buffer->capacity;
+    buffer->readable_size -= size;
+
+    xSemaphoreGive(buffer->mutex);
+    return size;
+}
+
 #endif
