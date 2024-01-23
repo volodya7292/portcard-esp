@@ -17,7 +17,6 @@
 #include "nvs_flash.h"
 #include "resources.h"
 // #include "esp_console.h"
-#include "ring.h"
 
 #define IO_AUDIO_FREQ 48000
 #define BLINK_GPIO GPIO_NUM_21
@@ -105,21 +104,25 @@ void app_main()
     }
     led_strip_refresh(led_strip);
 
+    RingbufHandle_t rb_in2trans = xRingbufferCreate(AUDIO_PROCESS_IN_RB_SIZE, RINGBUF_TYPE_BYTEBUF);
+    if (rb_in2trans == NULL)
+    {
+        printf("Failed to create ringbuf!\n");
+    }
 
-    ring_buffer_t rb_in2trans;
-    ring_buffer_init(&rb_in2trans, AUDIO_PROCESS_IN_RB_SIZE);
+    RingbufHandle_t rb_trans2out = xRingbufferCreate(AUDIO_PROCESS_OUT_RB_SIZE, RINGBUF_TYPE_BYTEBUF);
+    if (rb_trans2out == NULL)
+    {
+        printf("Failed to create ringbuf!\n");
+    }
 
-    ring_buffer_t rb_trans2out;
-    ring_buffer_init(&rb_trans2out, AUDIO_PROCESS_OUT_RB_SIZE);
+    init_i2s_audio(rb_trans2out, IO_AUDIO_FREQ);
 
-
-    init_i2s_audio(&rb_trans2out, IO_AUDIO_FREQ);
-
-    init_usb_audio(&rb_in2trans);
+    init_usb_audio(rb_in2trans);
     init_usb();
 
     // init_spi_receiver(rb_in2trans, on_controls_change);
-    init_audio_transformer(&rb_in2trans, &rb_trans2out, fl_wav_start, fr_wav_start);
+    init_audio_transformer(rb_in2trans, rb_trans2out, fl_wav_start, fr_wav_start);
 
 #if IS_DEBUG
     led_strip_set_pixel(led_strip, 0, 0, 16, 0);

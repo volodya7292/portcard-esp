@@ -29,7 +29,7 @@ const int16_t USB_VOL_MIN = -15360; // -60db
 const int16_t USB_VOL_MAX = 0;
 const int16_t USB_VOL_RES = 256;
 
-static ring_buffer_t* m_out_buf = NULL;
+static RingbufHandle_t m_out_buf = NULL;
 
 static uint8_t spk_buf[CFG_TUD_AUDIO_FUNC_1_EP_OUT_SW_BUF_SZ];
 static int8_t usb_mute[CFG_TUD_AUDIO_FUNC_1_N_CHANNELS_RX + 1];    // +1 for master channel 0
@@ -236,6 +236,8 @@ bool tud_audio_set_req_entity_cb(uint8_t rhport, tusb_control_request_t const *p
 
 bool tud_audio_rx_done_pre_read_cb(uint8_t rhport, uint16_t n_bytes_received, uint8_t func_id, uint8_t ep_out, uint8_t cur_alt_setting)
 {
+    static bool wait_for_out_cleanup = false;
+
     if (m_out_buf == NULL)
     {
         return true;
@@ -243,12 +245,23 @@ bool tud_audio_rx_done_pre_read_cb(uint8_t rhport, uint16_t n_bytes_received, ui
 
     uint32_t usb_spk_data_size = tud_audio_read(spk_buf, n_bytes_received);
 
-    ring_buffer_push(m_out_buf, spk_buf, usb_spk_data_size);
+    // maybe usb_spk_data_size invalid (not alinged) sometimes?
+
+    if (wait_for_out_cleanup && xRingbufferGetCurFreeSize(m_out_buf) < xRingbufferGetMaxItemSize(m_out_buf)) {
+        return true;
+    }
+    wait_for_out_cleanup = false;
+
+    bool success = xRingbufferSend(m_out_buf, spk_buf, usb_spk_data_size, 0);
+    if (!success) {
+        // if can't send, wait for complete cleanup to avoid crackling
+        wait_for_out_cleanup = true;
+    }
 
     return true;
 }
 
-void init_usb_audio(ring_buffer_t* out_buf)
+void init_usb_audio(RingbufHandle_t out_buf)
 {
     m_out_buf = out_buf;
 }

@@ -10,11 +10,11 @@
 #define I2S_DOUT_IO1 GPIO_NUM_34
 #define I2S_UNMUTE_PIN GPIO_NUM_18
 #define I2S_FULL_SAMPLE_SIZE (sizeof(int16_t) * 2) // 16bit * two channels
-#define I2S_DMA_FRAMES 480
+#define I2S_DMA_FRAMES 960
 #define I2S_BUFF_SIZE (I2S_DMA_FRAMES * I2S_FULL_SAMPLE_SIZE)
 
 static uint32_t m_output_freq = 0;
-static ring_buffer_t *m_in_rb = NULL;
+static RingbufHandle_t m_in_rb = NULL;
 static i2s_chan_handle_t tx_chan = NULL;
 
 static void i2s_init_std_simplex()
@@ -51,7 +51,7 @@ static void i2s_init_std_simplex()
 
 static void i2s_write_task(void *args)
 {
-    int16_t *w_buf = (int16_t *)malloc(I2S_BUFF_SIZE);
+    int16_t *w_buf = (int16_t *)calloc(sizeof(int16_t), I2S_BUFF_SIZE);
     assert(w_buf); // Check if w_buf allocation success
 
     // TODO
@@ -66,12 +66,14 @@ static void i2s_write_task(void *args)
 
     while (1)
     {
-        uint32_t w_buf_avail = ring_buffer_pull_up_to(m_in_rb, (uint8_t *)w_buf, I2S_FULL_SAMPLE_SIZE, I2S_BUFF_SIZE / I2S_FULL_SAMPLE_SIZE);
-        if (w_buf_avail == 0)
-        {
-            vTaskDelay(1);
-            continue;
-        }
+        size_t received_size = 0;
+        int16_t *bytes = xRingbufferReceiveUpTo(m_in_rb, &received_size, portMAX_DELAY, I2S_BUFF_SIZE);
+        uint32_t received_samples = received_size / I2S_FULL_SAMPLE_SIZE; // a sample has two values for two channels
+
+        uint32_t w_buf_avail = received_samples * I2S_FULL_SAMPLE_SIZE; // rounds byte count to two channels
+        memcpy(w_buf, bytes, w_buf_avail);
+        
+        vRingbufferReturnItem(m_in_rb, bytes);
 
         if (i2s_channel_write(tx_chan, w_buf, w_buf_avail, NULL, portMAX_DELAY) != ESP_OK)
         {
@@ -84,7 +86,7 @@ static void i2s_write_task(void *args)
     vTaskDelete(NULL);
 }
 
-void init_i2s_audio(ring_buffer_t *in_buf, uint32_t output_freq)
+void init_i2s_audio(RingbufHandle_t in_buf, uint32_t output_freq)
 {
     m_in_rb = in_buf;
     m_output_freq = output_freq;
