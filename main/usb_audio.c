@@ -245,9 +245,9 @@ bool tud_audio_rx_done_pre_read_cb(uint8_t rhport, uint16_t n_bytes_received, ui
 
     uint32_t usb_spk_data_size = tud_audio_read(spk_buf, n_bytes_received);
 
-    // maybe usb_spk_data_size invalid (not alinged) sometimes?
-
-    if (wait_for_out_cleanup && xRingbufferGetCurFreeSize(m_out_buf) < xRingbufferGetMaxItemSize(m_out_buf)) {
+    UBaseType_t out_to_read = 0;
+    vRingbufferGetInfo(m_out_buf, NULL, NULL, NULL, NULL, &out_to_read);
+    if (wait_for_out_cleanup && out_to_read > 0) {
         return true;
     }
     wait_for_out_cleanup = false;

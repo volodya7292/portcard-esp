@@ -16,9 +16,9 @@
 #include "spi_receiver.h"
 #include "nvs_flash.h"
 #include "resources.h"
+#include "common.h"
 // #include "esp_console.h"
 
-#define IO_AUDIO_FREQ 48000
 #define BLINK_GPIO GPIO_NUM_21
 
 // double-buffered ring buffer sizes

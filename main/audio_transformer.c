@@ -6,6 +6,7 @@
 #include "block_convoler.h"
 #include "esp_psram.h"
 #include "stdatomic.h"
+#include "common.h"
 
 #define IN_CHANNELS 2
 #define SLIDING_CHANNELS 2
@@ -45,23 +46,6 @@ static int16_t *get_sliding_block(uint32_t ch)
 {
     uint32_t ch_size = AUDIO_PROCESS_BLOCK_SIZE * NUM_WINDOWS;
     return sliding_blocks + ch * ch_size;
-}
-
-static void receive_full_buffer()
-{
-    uint32_t left_to_receive = sizeof(in_samples);
-
-    while (left_to_receive > 0)
-    {
-        size_t received_size = 0;
-        void *bytes = xRingbufferReceiveUpTo(m_in_rb, &received_size, portMAX_DELAY, left_to_receive);
-
-        uint32_t dst_offset = sizeof(in_samples) - left_to_receive;
-        memcpy((uint8_t *)in_samples + dst_offset, bytes, received_size);
-
-        left_to_receive -= received_size;
-        vRingbufferReturnItem(m_in_rb, bytes);
-    }
 }
 
 static void conv_worker(void *args)
@@ -166,16 +150,22 @@ static void transformer_task(void *args)
 
     while (1)
     {
-        receive_full_buffer();
+        uint32_t max_wait_ms = (1000 * AUDIO_PROCESS_BLOCK_SIZE / IO_AUDIO_FREQ) * 2;
+        bool succ = receive_full_buffer(m_in_rb, sizeof(in_samples), max_wait_ms / portTICK_PERIOD_MS, in_samples);
+        if (!succ)
+        {
+            continue;
+        }
 
         // uint32_t t0 = esp_cpu_get_cycle_count();
         do_process();
         // uint32_t t1 = esp_cpu_get_cycle_count();
 
         // printf("TT2: %lu\n", t1 - t0);
-        
 
-        if (wait_for_out_cleanup && xRingbufferGetCurFreeSize(m_out_rb) < xRingbufferGetMaxItemSize(m_out_rb))
+        UBaseType_t out_to_read = 0;
+        vRingbufferGetInfo(m_out_rb, NULL, NULL, NULL, NULL, &out_to_read);
+        if (wait_for_out_cleanup && out_to_read > 0)
         {
             continue;
         }
